@@ -1,0 +1,45 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Point the in-game QR code at this repo's APK download
+        run: sed -i "s#__SHARE_URL__#https://github.com/${{ github.repository }}/releases/latest/download/chasing-shadows.apk#" app/src/main/assets/index.html
+
+      - name: Build
+        run: gradle assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk chasing-shadows.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chasing-shadows-apk
+          path: chasing-shadows.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" chasing-shadows.apk --title "Chasing Shadows $TAG" --notes "Download chasing-shadows.apk and open it on an Android phone." --latest
